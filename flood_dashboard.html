@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LEWIS — Local Early Warning & Information System</title>
+  <meta name="description"
+    content="Real-time flood monitoring dashboard for Kabankalan City. Tracks water levels, rainfall rates, and sends SMS alerts on critical flood conditions.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet">
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+  <style>
+    /* ====================================================
+     RESET + BASE
+  ==================================================== */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      /* Background */
+      --bg-dark: #080c14;
+      --bg-card: rgba(255, 255, 255, 0.04);
+      --bg-card-hov: rgba(255, 255, 255, 0.07);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hov: rgba(255, 255, 255, 0.18);
+
+      /* Text */
+      --text: #f0f4ff;
+      --muted: #8892a4;
+      --hint: #4e5a6e;
+
+      /* Brand accent */
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.25);
+
+      /* Status colours */
+      --safe: #10b981;
+      --safe-glow: rgba(16, 185, 129, 0.2);
+      --safe-dim: rgba(16, 185, 129, 0.12);
+      --warn: #f59e0b;
+      --warn-glow: rgba(245, 158, 11, 0.2);
+      --warn-dim: rgba(245, 158, 11, 0.12);
+      --crit: #ef4444;
+      --crit-glow: rgba(239, 68, 68, 0.3);
+      --crit-dim: rgba(239, 68, 68, 0.12);
+      --info: #3b82f6;
+      --info-glow: rgba(59, 130, 246, 0.2);
+      --info-dim: rgba(59, 130, 246, 0.10);
+
+      /* Shape */
+      --radius: 14px;
+      --radius-sm: 9px;
+      --radius-xs: 6px;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background gradient mesh ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(16, 185, 129, 0.08) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 60% at 50% 50%, rgba(8, 12, 20, 0) 0%, #080c14 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body>* {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ====================================================
+     HEADER
+  ==================================================== */
+    header {
+      background: rgba(8, 12, 20, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 62px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05));
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(59, 130, 246, 0.15);
+    }
+
+    .logo-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--accent);
+      filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
+    }
+
+    .logo-text {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #f0f4ff, #94acd4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .connection-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      transition: all .3s;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--safe);
+      box-shadow: 0 0 6px var(--safe);
+      animation: pulse 1.8s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .live-dot.offline {
+      background: var(--crit);
+      box-shadow: 0 0 6px var(--crit);
+      animation: none;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.4;
+        transform: scale(0.75);
+      }
+    }
+
+    #connection-status {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    #last-updated {
+      font-size: 11px;
+      color: var(--hint);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ====================================================
+     MAIN LAYOUT
+  ==================================================== */
+    main {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 28px 24px 72px;
+    }
+
+    /* Section heading */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--hint);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ====================================================
+     ALERT BANNER
+  ==================================================== */
+    #alert-banner {
+      border-radius: var(--radius-sm);
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid;
+      transition: all .4s cubic-bezier(.4, 0, .2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #alert-banner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.06;
+      background: currentColor;
+      pointer-events: none;
+    }
+
+    #alert-banner.safe {
+      background: var(--safe-dim);
+      border-color: rgba(16, 185, 129, 0.25);
+      color: #34d399;
+    }
+
+    #alert-banner.warning {
+      background: var(--warn-dim);
+      border-color: rgba(245, 158, 11, 0.25);
+      color: #fbbf24;
+    }
+
+    #alert-banner.critical {
+      background: var(--crit-dim);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #f87171;
+      animation: flashBanner 1.2s ease-in-out infinite;
+      box-shadow: 0 0 30px rgba(239, 68, 68, 0.15);
+    }
+
+    @keyframes flashBanner {
+
+      0%,
+      100% {
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.1);
+      }
+
+      50% {
+        box-shadow: 0 0 40px rgba(239, 68, 68, 0.3);
+      }
+    }
+
+    .banner-icon {
+      font-size: 20px;
+    }
+
+    /* ====================================================
+     STAT CARDS
+  ==================================================== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      transition: all .25s cubic-bezier(.4, 0, .2, 1);
+      cursor: default;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle shimmer on hover */
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.04) 0%, transparent 65%);
+      opacity: 0;
+      transition: opacity .3s;
+      pointer-events: none;
+    }
+
+    .stat-card:hover {
+      background: var(--bg-card-hov);
+      border-color: var(--border-hov);
+      transform: translateY(-2px);
+    }
+
+    .stat-card:hover::before {
+      opacity: 1;
+    }
+
+    .stat-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--hint);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-label-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .stat-value {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1;
+      margin-bottom: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-sub {
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* Status-coloured stat cards */
+    .stat-card.safe-card .stat-value {
+      color: var(--safe);
+      text-shadow: 0 0 20px var(--safe-glow);
+    }
+
+    .stat-card.warn-card .stat-value {
+      color: var(--warn);
+      text-shadow: 0 0 20px var(--warn-glow);
+    }
+
+    .stat-card.crit-card .stat-value {
+      color: var(--crit);
+      text-shadow: 0 0 20px var(--crit-glow);
+    }
+
+    .stat-card.info-card .stat-value {
+      color: var(--info);
+      text-shadow: 0 0 20px var(--info-glow);
+    }
+
+    .stat-card.crit-card {
+      box-shadow: inset 0 0 40px rgba(239, 68, 68, 0.05), 0 0 0 1px rgba(239, 68, 68, 0.15);
+    }
+
+    .stat-card.warn-card {
+      box-shadow: inset 0 0 40px rgba(245, 158, 11, 0.05), 0 0 0 1px rgba(245, 158, 11, 0.15);
+    }
+
+    .stat-card.safe-card {
+      box-shadow: inset 0 0 40px rgba(16, 185, 129, 0.05), 0 0 0 1px rgba(16, 185, 129, 0.12);
+    }
+
+    /* Water level bar */
+    .level-bar-wrap {
+      height: 5px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .level-bar-fill {
+      height: 5px;
+      border-radius: 3px;
+      transition: width .6s cubic-bezier(.4, 0, .2, 1), background .4s;
+      background: var(--safe);
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    /* ====================================================
+     CHART PANELS
+  ==================================================== */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      margin-bottom: 16px;
+      transition: border-color .2s;
+    }
+
+    .panel:hover {
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+
+    .panel-sub {
+      font-size: 11.5px;
+      color: var(--hint);
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 230px;
+    }
+
+    .btn-clear {
+      font-size: 11.5px;
+      font-family: 'Inter', sans-serif;
+      padding: 6px 14px;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .2s;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .btn-clear:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: var(--text);
+    }
+
+    /* ====================================================
+     TWO-COLUMN LAYOUT
+  ==================================================== */
+    .two-col {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+    }
+
+    /* ====================================================
+     LOG TABLE
+  ==================================================== */
+    .log-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .log-table th {
+      text-align: left;
+      padding: 9px 14px;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--hint);
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .log-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+      transition: background .15s;
+    }
+
+    .log-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .log-table tr:hover td {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+    }
+
+    .pill-safe {
+      background: var(--safe-dim);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .pill-warn {
+      background: var(--warn-dim);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .pill-crit {
+      background: var(--crit-dim);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    /* ====================================================
+     THRESHOLDS PANEL
+  ==================================================== */
+    .threshold-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 13px;
+      transition: padding-left .2s;
+    }
+
+    .threshold-row:last-child {
+      border-bottom: none;
+    }
+
+    .threshold-row:hover {
+      padding-left: 4px;
+    }
+
+    .thresh-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px currentColor;
+    }
+
+    .thresh-label {
+      flex: 1;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .thresh-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      color: var(--hint);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* Info block inside thresholds */
+    .info-block {
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+    }
+
+    .info-block-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--hint);
+      margin-bottom: 10px;
+    }
+
+    .info-block-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .info-block-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-block-row strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    /* ====================================================
+     FOOTER
+  ==================================================== */
+    footer {
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--hint);
+      padding: 22px 20px;
+      border-top: 1px solid var(--border);
+      background: rgba(8, 12, 20, 0.6);
+      backdrop-filter: blur(10px);
+      letter-spacing: 0.03em;
+    }
+
+    footer span {
+      color: var(--muted);
+    }
+
+    /* ====================================================
+     RESPONSIVE
+  ==================================================== */
+    @media (max-width: 768px) {
+      header {
+        padding: 0 16px;
+      }
+
+      main {
+        padding: 16px 14px 48px;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .stat-value {
+        font-size: 26px;
+      }
+
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      #last-updated {
+        display: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .stat-value {
+        font-size: 22px;
+        letter-spacing: -0.5px;
+      }
+
+      .connection-badge span:last-of-type {
+        display: none;
+      }
+    }
+
+    /* ====================================================
+     SCROLL BAR
+  ==================================================== */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    /* ====================================================
+     MISC UTILITIES
+  ==================================================== */
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ========================================================
+     HEADER
+======================================================== -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C8 8 4 11 4 15a8 8 0 0016 0c0-4-4-7-8-13z" />
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">LEWIS</div>
+        <div class="logo-sub">Local Early Warning &amp; Information System</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="connection-badge">
+        <div class="live-dot" id="live-dot"></div>
+        <span id="connection-status">Connecting…</span>
+      </div>
+      <span id="last-updated">—</span>
+    </div>
+  </header>
+
+  <!-- ========================================================
+     MAIN CONTENT
+======================================================== -->
+  <main>
+
+    <!-- Alert Banner -->
+    <div id="alert-banner" class="safe">
+      <span class="banner-icon">&#9989;</span>
+      <span id="banner-text">System online — water levels are safe</span>
+    </div>
+
+    <!-- Section: Overview -->
+    <div class="section-label">Live Overview</div>
+
+    <!-- Stat Cards -->
+    <div class="stats-grid">
+
+      <div class="stat-card" id="card-water">
+        <div class="stat-label">
+          <span class="stat-label-dot" style="color:var(--safe)"></span>
+          Water Level
+        </div>
+        <div class="stat-value" id="stat-water">-- cm</div>
+        <div class="stat-sub" id="stat-water-sub">Reading…</div>
+        <div class="level-bar-wrap">
+          <div class="level-bar-fill" id="level-bar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="stat-card info-card" id="card-rain">
+        <div class="stat-label">
+          <span class="stat-label-dot" style="color:var(--info)"></span>
+          Rainfall Rate
+        </div>
+        <div class="stat-value" id="stat-rain">-- mm/h</div>
+        <div class="stat-sub" id="stat-rain-sub">Reading…</div>
+      </div>
+
+      <div class="stat-card" id="card-alert">
+        <div class="stat-label">
+          <span class="stat-label-dot" style="color:var(--muted)"></span>
+          Alert Status
+        </div>
+        <div class="stat-value" id="stat-alert">--</div>
+        <div class="stat-sub" id="stat-alert-sub">Waiting for data</div>
+      </div>
+
+      <div class="stat-card info-card">
+        <div class="stat-label">
+          <span class="stat-label-dot" style="color:var(--info)"></span>
+          Total Logs
+        </div>
+        <div class="stat-value" id="stat-logs">0</div>
+        <div class="stat-sub">readings recorded</div>
+      </div>
+
+    </div>
+
+    <!-- Section: Charts -->
+    <div class="section-label">Sensor History</div>
+
+    <!-- Water Level Chart -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Water Level History</div>
+          <div class="panel-sub">Last 20 readings · updates every 60 s</div>
+        </div>
+        <button class="btn-clear" onclick="clearChart()" id="btn-clear">Clear chart</button>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="waterChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Rain Rate Chart -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Rainfall Rate History</div>
+          <div class="panel-sub">Estimated mm/hr · last 20 readings</div>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="rainChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Section: Data -->
+    <div class="section-label">Data &amp; Reference</div>
+
+    <!-- Two-column: log table + thresholds -->
+    <div class="two-col">
+
+      <!-- Recent log table -->
+      <div class="panel" style="overflow-x:auto">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Recent Readings</div>
+            <div class="panel-sub">Latest 10 entries from Firebase</div>
+          </div>
+        </div>
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>Water</th>
+              <th>Rain</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="log-tbody">
+            <tr>
+              <td colspan="5" style="color:var(--hint);text-align:center;padding:28px;font-size:13px">
+                Waiting for data…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Thresholds + Info -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Alert Thresholds</div>
+        </div>
+
+        <div class="threshold-row">
+          <div class="thresh-dot" style="background:var(--safe);color:var(--safe)"></div>
+          <span class="thresh-label">Safe</span>
+          <span class="thresh-val">below 30 cm</span>
+        </div>
+        <div class="threshold-row">
+          <div class="thresh-dot" style="background:var(--warn);color:var(--warn)"></div>
+          <span class="thresh-label">Warning</span>
+          <span class="thresh-val">30 – 60 cm</span>
+        </div>
+        <div class="threshold-row">
+          <div class="thresh-dot" style="background:var(--crit);color:var(--crit)"></div>
+          <span class="thresh-label">Critical</span>
+          <span class="thresh-val">above 60 cm</span>
+        </div>
+        <div class="threshold-row">
+          <div class="thresh-dot" style="background:var(--info);color:var(--info)"></div>
+          <span class="thresh-label">Heavy rain</span>
+          <span class="thresh-val">≥ 15 mm/hr</span>
+        </div>
+
+        <div class="info-block">
+          <div class="info-block-title">Mount Info</div>
+          <div class="info-block-row">
+            <span>Sensor height</span><strong>150 cm</strong>
+          </div>
+          <div class="info-block-row">
+            <span>Location</span><strong>Canal Node 1</strong>
+          </div>
+          <div class="info-block-row">
+            <span>Installed</span><strong>2026</strong>
+          </div>
+        </div>
+
+        <div class="info-block">
+          <div class="info-block-title">Quick Guide</div>
+          <div class="info-block-row">
+            <span>🟢 Green</span><strong>Safe — no action</strong>
+          </div>
+          <div class="info-block-row">
+            <span>🟡 Yellow</span><strong>Warning — monitor</strong>
+          </div>
+          <div class="info-block-row">
+            <span>🔴 Red</span><strong>Critical — evacuate</strong>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer>
+    <span>LEWIS</span> &nbsp;·&nbsp;
+    <span>ESP32 IoT Project</span> &nbsp;·&nbsp;
+    <span>Kabankalan City, Philippines</span> &nbsp;·&nbsp;
+    Data refreshes every 60 seconds
+  </footer>
+
+
+  <!-- ========================================================
+     JAVASCRIPT
+======================================================== -->
+  <script>
+    // --------------------------------------------------------
+    //  FIREBASE CONFIG
+    // --------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyArXXSkoBAUBQ8w5BgqC1m9NvzJKN5n2L8",
+      authDomain: "flood-warning-system-29346.firebaseapp.com",
+      projectId: "flood-warning-system-29346",
+      storageBucket: "flood-warning-system-29346.firebasestorage.app",
+      messagingSenderId: "314512905276",
+      appId: "1:314512905276:web:b46f8f8fff4ed57b029f39",
+      measurementId: "G-DNQL75E01M"
+    };
+
+    // --------------------------------------------------------
+    //  THRESHOLDS (must match your .ino file)
+    // --------------------------------------------------------
+    const WARN_CM = 30;
+    const CRIT_CM = 60;
+    const MAX_CM = 80;
+    const HEAVY_RAIN = 15;
+
+    // --------------------------------------------------------
+    //  INIT FIREBASE
+    // --------------------------------------------------------
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --------------------------------------------------------
+    //  CHART SETUP
+    // --------------------------------------------------------
+    const chartDefaults = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(10,15,28,0.95)',
+          titleColor: '#f0f4ff',
+          bodyColor: '#8892a4',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 8,
+          displayColors: false
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: '#4e5a6e',
+            font: { size: 10, family: 'JetBrains Mono' },
+            maxRotation: 0
+          }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: '#4e5a6e',
+            font: { size: 10, family: 'JetBrains Mono' }
+          }
+        }
+      },
+      animation: { duration: 500, easing: 'easeInOutQuart' }
+    };
+
+    // Water level chart
+    const waterCtx = document.getElementById('waterChart').getContext('2d');
+
+    // Gradient fill for water chart
+    function makeBlueGradient(ctx) {
+      const g = ctx.createLinearGradient(0, 0, 0, 230);
+      g.addColorStop(0, 'rgba(59,130,246,0.25)');
+      g.addColorStop(1, 'rgba(59,130,246,0)');
+      return g;
+    }
+
+    const waterChart = new Chart(waterCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          borderColor: '#3b82f6',
+          backgroundColor: makeBlueGradient(waterCtx),
+          borderWidth: 2,
+          pointRadius: 3.5,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: 'rgba(59,130,246,0.3)',
+          pointBorderWidth: 3,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        scales: {
+          ...chartDefaults.scales,
+          y: {
+            ...chartDefaults.scales.y,
+            min: 0,
+            max: MAX_CM,
+            ticks: {
+              ...chartDefaults.scales.y.ticks,
+              callback: v => v + ' cm'
+            }
+          }
+        }
+      }
+    });
+
+    // Rain rate chart
+    const rainCtx = document.getElementById('rainChart').getContext('2d');
+    const rainChart = new Chart(rainCtx, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          backgroundColor: [],
+          borderRadius: 5,
+          borderWidth: 0,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        scales: {
+          ...chartDefaults.scales,
+          y: {
+            ...chartDefaults.scales.y,
+            min: 0,
+            ticks: {
+              ...chartDefaults.scales.y.ticks,
+              callback: v => v + ' mm/h'
+            }
+          }
+        }
+      }
+    });
+
+    // --------------------------------------------------------
+    //  HELPERS
+    // --------------------------------------------------------
+    function levelColor(level) {
+      if (level >= CRIT_CM) return '#ef4444';
+      if (level >= WARN_CM) return '#f59e0b';
+      return '#10b981';
+    }
+
+    function rainColor(rate) {
+      if (rate >= HEAVY_RAIN) return 'rgba(239,68,68,0.7)';
+      if (rate > 0) return 'rgba(59,130,246,0.6)';
+      return 'rgba(78,90,110,0.5)';
+    }
+
+    function formatTime(ts) {
+      if (!ts) return '—';
+      const d = new Date(ts * 1000);
+      return d.toLocaleTimeString('en-PH', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+
+    // --------------------------------------------------------
+    //  UPDATE DASHBOARD
+    // --------------------------------------------------------
+    function updateDashboard(data) {
+      if (!data) return;
+
+      const level = parseFloat(data.waterLevel || 0);
+      const rain = parseFloat(data.rainRate || 0);
+      const alert = parseInt(data.alertLevel || 0);
+      const raining = data.isRaining || false;
+      const ts = data.timestamp || 0;
+
+      // Alert banner
+      const banner = document.getElementById('alert-banner');
+      const bannerTxt = document.getElementById('banner-text');
+      banner.className = '';
+      if (alert === 2) {
+        banner.classList.add('critical');
+        bannerTxt.innerHTML = '&#9888;&#65039; CRITICAL FLOOD LEVEL — Water at '
+          + Math.round(level) + ' cm — SMS alerts sent!';
+      } else if (alert === 1) {
+        banner.classList.add('warning');
+        bannerTxt.innerHTML = '&#9888;&#65039; WARNING — Water rising to '
+          + Math.round(level) + ' cm — monitor closely';
+      } else if (raining && rain >= HEAVY_RAIN) {
+        banner.classList.add('warning');
+        bannerTxt.innerHTML = '&#9928; Heavy rain detected — '
+          + Math.round(rain) + ' mm/hr — flood possible soon';
+      } else {
+        banner.classList.add('safe');
+        bannerTxt.innerHTML = '&#9989; Water levels are safe — '
+          + Math.round(level) + ' cm';
+      }
+
+      // Water level card
+      const waterCard = document.getElementById('card-water');
+      waterCard.className = 'stat-card';
+      if (alert === 2) waterCard.classList.add('crit-card');
+      else if (alert === 1) waterCard.classList.add('warn-card');
+      else waterCard.classList.add('safe-card');
+
+      document.getElementById('stat-water').textContent = Math.round(level) + ' cm';
+      document.getElementById('stat-water-sub').textContent =
+        alert === 2 ? 'Critical — above ' + CRIT_CM + ' cm' :
+          alert === 1 ? 'Warning — above ' + WARN_CM + ' cm' :
+            'Safe — below ' + WARN_CM + ' cm';
+
+      const barPct = Math.min(100, (level / MAX_CM) * 100);
+      const bar = document.getElementById('level-bar');
+      bar.style.width = barPct + '%';
+      bar.style.background = levelColor(level);
+      bar.style.boxShadow = '0 0 8px ' + levelColor(level);
+
+      // Rain card
+      document.getElementById('stat-rain').textContent =
+        raining ? Math.round(rain) + ' mm/h' : '0 mm/h';
+      document.getElementById('stat-rain-sub').textContent =
+        raining ? (rain >= HEAVY_RAIN ? 'Heavy rain — alert active' :
+          rain > 0 ? 'Light-moderate rain' : 'Raining') :
+          'No rain detected';
+
+      // Alert status card
+      const alertCard = document.getElementById('card-alert');
+      alertCard.className = 'stat-card';
+      const alertEl = document.getElementById('stat-alert');
+      const alertSub = document.getElementById('stat-alert-sub');
+      if (alert === 2) {
+        alertCard.classList.add('crit-card');
+        alertEl.textContent = 'CRITICAL';
+        alertSub.textContent = 'SMS sent to all contacts';
+      } else if (alert === 1) {
+        alertCard.classList.add('warn-card');
+        alertEl.textContent = 'WARNING';
+        alertSub.textContent = 'SMS sent to all contacts';
+      } else {
+        alertCard.classList.add('safe-card');
+        alertEl.textContent = 'SAFE';
+        alertSub.textContent = 'No action needed';
+      }
+
+      // Last updated
+      document.getElementById('last-updated').textContent =
+        'Updated ' + formatTime(ts);
+
+      return { level, rain, alert, raining, ts };
+    }
+
+    // --------------------------------------------------------
+    //  CHART HELPERS
+    // --------------------------------------------------------
+    const MAX_POINTS = 20;
+
+    function addChartPoint(label, level, rain) {
+      // Water chart
+      waterChart.data.labels.push(label);
+      waterChart.data.datasets[0].data.push(Math.round(level));
+      if (waterChart.data.labels.length > MAX_POINTS) {
+        waterChart.data.labels.shift();
+        waterChart.data.datasets[0].data.shift();
+      }
+      waterChart.update();
+
+      // Rain chart
+      rainChart.data.labels.push(label);
+      rainChart.data.datasets[0].data.push(Math.round(rain));
+      rainChart.data.datasets[0].backgroundColor.push(rainColor(rain));
+      if (rainChart.data.labels.length > MAX_POINTS) {
+        rainChart.data.labels.shift();
+        rainChart.data.datasets[0].data.shift();
+        rainChart.data.datasets[0].backgroundColor.shift();
+      }
+      rainChart.update();
+    }
+
+    function clearChart() {
+      waterChart.data.labels = [];
+      waterChart.data.datasets[0].data = [];
+      rainChart.data.labels = [];
+      rainChart.data.datasets[0].data = [];
+      rainChart.data.datasets[0].backgroundColor = [];
+      waterChart.update();
+      rainChart.update();
+    }
+
+    // --------------------------------------------------------
+    //  LOG TABLE
+    // --------------------------------------------------------
+    let logEntries = [];
+
+    // --------------------------------------------------------
+    //  FIREBASE LISTENERS
+    // --------------------------------------------------------
+    let totalLogs = 0;
+
+    // Live latest reading
+    db.ref('/flooddata/latest').on('value', snap => {
+      const data = snap.val();
+      if (!data) return;
+      const result = updateDashboard(data);
+      if (result) {
+        addChartPoint(formatTime(result.ts), result.level, result.rain);
+      }
+      document.getElementById('live-dot').className = 'live-dot';
+      document.getElementById('connection-status').textContent = 'Live';
+    });
+
+    // All logs for count + table
+    db.ref('/flooddata').on('value', snap => {
+      const data = snap.val();
+      if (!data) return;
+
+      const keys = Object.keys(data).filter(k => k !== 'latest');
+      totalLogs = keys.length;
+      document.getElementById('stat-logs').textContent = totalLogs;
+
+      const entries = keys
+        .filter(k => data[k] && data[k].timestamp)
+        .sort((a, b) => (data[b].timestamp || 0) - (data[a].timestamp || 0))
+        .slice(0, 10);
+
+      logEntries = [];
+      const tbody = document.getElementById('log-tbody');
+      if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--hint);text-align:center;padding:28px;font-size:13px">No data yet</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = entries.map((key, i) => {
+        const e = data[key];
+        const level = parseFloat(e.waterLevel || 0);
+        const rain = parseFloat(e.rainRate || 0);
+        const alert = parseInt(e.alertLevel || 0);
+        const ts = e.timestamp || 0;
+        const pillClass = alert === 2 ? 'pill-crit' : alert === 1 ? 'pill-warn' : 'pill-safe';
+        const pillText = alert === 2 ? 'Critical' : alert === 1 ? 'Warning' : 'Safe';
+        return `<tr>
+        <td class="mono" style="color:var(--hint);font-size:12px">${totalLogs - i}</td>
+        <td class="mono" style="font-size:12px">${formatTime(ts)}</td>
+        <td style="font-weight:600;color:${levelColor(level)}">${Math.round(level)} cm</td>
+        <td style="color:var(--info);font-weight:500">${Math.round(rain)} mm/h</td>
+        <td><span class="status-pill ${pillClass}">${pillText}</span></td>
+      </tr>`;
+      }).join('');
+    });
+
+    // Connection state
+    db.ref('.info/connected').on('value', snap => {
+      const connected = snap.val();
+      const dot = document.getElementById('live-dot');
+      const status = document.getElementById('connection-status');
+      if (connected) {
+        dot.className = 'live-dot';
+        status.textContent = 'Live';
+      } else {
+        dot.className = 'live-dot offline';
+        status.textContent = 'Offline';
+      }
+    });
+  </script>
+
+</body>
+
+</html>
