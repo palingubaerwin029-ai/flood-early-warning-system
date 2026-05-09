@@ -17,6 +17,17 @@
   --border: rgba(255, 255, 255, 0.08);
   --border-hov: rgba(255, 255, 255, 0.18);
 
+  /* Added for theming */
+  --bg-header: rgba(8, 12, 20, 0.85);
+  --bg-footer: rgba(8, 12, 20, 0.6);
+  --bg-btn: rgba(255, 255, 255, 0.04);
+  --bg-th: rgba(255, 255, 255, 0.02);
+  --bg-info-block: rgba(255, 255, 255, 0.02);
+  --logo-grad-start: #f0f4ff;
+  --logo-grad-end: #94acd4;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hov: rgba(255, 255, 255, 0.14);
+
   /* Text */
   --text: #f0f4ff;
   --muted: #8892a4;
@@ -44,6 +55,56 @@
   --radius: 14px;
   --radius-sm: 9px;
   --radius-xs: 6px;
+}
+
+:root[data-theme="light"] {
+  /* Background */
+  --bg-dark: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hov: #f1f5f9;
+  --border: #e2e8f0;
+  --border-hov: #cbd5e1;
+
+  /* Added for theming */
+  --bg-header: rgba(255, 255, 255, 0.85);
+  --bg-footer: rgba(248, 250, 252, 0.8);
+  --bg-btn: #f1f5f9;
+  --bg-th: #f8fafc;
+  --bg-info-block: #f8fafc;
+  --logo-grad-start: #0f172a;
+  --logo-grad-end: #334155;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.1);
+  --scrollbar-thumb-hov: rgba(0, 0, 0, 0.2);
+
+  /* Text */
+  --text: #0f172a;
+  --muted: #475569;
+  --hint: #64748b;
+
+  /* Brand accent */
+  --accent: #2563eb;
+  --accent-glow: rgba(37, 99, 235, 0.15);
+
+  /* Status colours */
+  --safe: #10b981;
+  --safe-glow: rgba(16, 185, 129, 0.15);
+  --safe-dim: rgba(16, 185, 129, 0.08);
+  --warn: #f59e0b;
+  --warn-glow: rgba(245, 158, 11, 0.15);
+  --warn-dim: rgba(245, 158, 11, 0.08);
+  --crit: #ef4444;
+  --crit-glow: rgba(239, 68, 68, 0.15);
+  --crit-dim: rgba(239, 68, 68, 0.08);
+  --info: #3b82f6;
+  --info-glow: rgba(59, 130, 246, 0.15);
+  --info-dim: rgba(59, 130, 246, 0.08);
+}
+
+:root[data-theme="light"] body::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(16, 185, 129, 0.05) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 60% at 50% 50%, rgba(248, 250, 252, 0) 0%, #f8fafc 100%);
 }
 
 html {
@@ -80,7 +141,7 @@ body>* {
      HEADER
   ==================================================== */
 header {
-  background: rgba(8, 12, 20, 0.85);
+  background: var(--bg-header);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
@@ -123,7 +184,7 @@ header {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #f0f4ff, #94acd4);
+  background: linear-gradient(135deg, var(--logo-grad-start), var(--logo-grad-end));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -461,7 +522,7 @@ main {
   padding: 6px 14px;
   border-radius: var(--radius-xs);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-btn);
   color: var(--muted);
   cursor: pointer;
   transition: all .2s;
@@ -503,7 +564,7 @@ main {
   text-transform: uppercase;
   color: var(--hint);
   border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-th);
 }
 
 .log-table td {
@@ -597,7 +658,7 @@ main {
 /* Info block inside thresholds */
 .info-block {
   margin-top: 20px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-info-block);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 14px;
@@ -639,7 +700,7 @@ footer {
   color: var(--hint);
   padding: 22px 20px;
   border-top: 1px solid var(--border);
-  background: rgba(8, 12, 20, 0.6);
+  background: var(--bg-footer);
   backdrop-filter: blur(10px);
   letter-spacing: 0.03em;
 }
@@ -705,12 +766,12 @@ footer span {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--scrollbar-thumb-hov);
 }
 
 /* ====================================================
